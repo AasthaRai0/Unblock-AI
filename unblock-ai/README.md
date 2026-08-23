@@ -186,20 +186,3 @@ Open **http://localhost:5173** and log in with `admin@unblock.ai` / `password123
   risk, and amount recovered — all real, all queryable after the fact.
 
 ---
-
-## Environment variables
-
-**server/.env**
-```
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/unblockai?schema=public"
-JWT_SECRET="change_me"
-RAZORPAY_KEY_ID="rzp_test_xxxx"
-RAZORPAY_KEY_SECRET="xxxx"
-PORT=4000
-```
-
-**client/.env** (optional — only needed if not using the Vite dev proxy)
-```
-VITE_API_URL=
-VITE_SOCKET_URL=
-```
