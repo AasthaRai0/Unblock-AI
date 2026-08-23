@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0A0D12;
+  --color-surface: #10141C;
+  --color-surface-2: #161B26;
+  --color-surface-3: #1C2230;
+  --color-border: #232A38;
+  --color-border-soft: #1A2029;
+
+  --color-text: #E9EDF5;
+  --color-text-muted: #8A93A6;
+  --color-text-dim: #565F70;
+
+  --color-risk: #F5A623;
+  --color-risk-dim: #4A3A1A;
+  --color-recovered: #2FD69B;
+  --color-recovered-dim: #163A2E;
+  --color-ai: #6E7BF2;
+  --color-ai-dim: #24264A;
+  --color-danger: #F0555A;
+  --color-danger-dim: #401E22;
+
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(110, 123, 242, 0.06), transparent 40%),
+    radial-gradient(circle at 85% 100%, rgba(47, 214, 155, 0.04), transparent 45%);
+  background-attachment: fixed;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-surface-3); }
+
+.font-display { font-family: var(--font-display); }
+.font-mono-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.pulse-dot { animation: pulse-dot 1.8s ease-in-out infinite; }
+
+@keyframes flow-dash {
+  to { stroke-dashoffset: -24; }
+}
+.flow-edge { stroke-dasharray: 4 6; animation: flow-dash 1s linear infinite; }
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-in { animation: fade-in-up 0.35s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot, .flow-edge, .animate-in { animation: none !important; }
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ai);
+  outline-offset: 2px;
+}

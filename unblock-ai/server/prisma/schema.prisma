@@ -1,0 +1,336 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================================
+// ENUMS
+// ==========================================================
+
+enum UserRole {
+  ADMIN
+  OPS
+  ANALYST
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  DEADLOCKED
+  RECOVERING
+  RECOVERED
+  ESCALATED
+}
+
+enum NodeType {
+  CUSTOMER
+  PAYMENT_GATEWAY
+  PLATFORM
+  SPLIT
+  VENDOR
+  BANK
+}
+
+enum NodeStatus {
+  SUCCESS
+  FAILED
+  PENDING
+  PAUSED
+}
+
+enum SplitStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum FaultParty {
+  CUSTOMER
+  VENDOR
+  PLATFORM
+  GATEWAY
+  AMBIGUOUS
+}
+
+enum DeadlockStatus {
+  OPEN
+  INVESTIGATING
+  RECOVERING
+  RESOLVED
+  ESCALATED
+}
+
+enum ActionType {
+  RETRY_PAYMENT
+  SEND_CUSTOMER_NOTIFICATION
+  SEND_VENDOR_NOTIFICATION
+  PAUSE_RETRY
+  ESCALATE_OPS
+  ESCALATE_COMPLIANCE
+  RETRY_SETTLEMENT
+  HUMAN_REVIEW
+}
+
+enum ActionStatus {
+  PENDING
+  EXECUTED
+  COMPLETED
+  FAILED
+  BLOCKED
+}
+
+enum MissionStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  COMPLETED
+  STOPPED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum RecipientType {
+  CUSTOMER
+  VENDOR
+  OPS
+  COMPLIANCE
+}
+
+// ==========================================================
+// MODELS
+// ==========================================================
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(OPS)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+model Customer {
+  id            String   @id @default(uuid())
+  name          String
+  email         String
+  phone         String
+  paymentMethod String   @map("payment_method")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  transactions Transaction[]
+
+  @@map("customers")
+}
+
+model Vendor {
+  id                String   @id @default(uuid())
+  name              String
+  email             String
+  phone             String
+  bankName          String   @map("bank_name")
+  accountLast4      String   @map("account_last4")
+  ifsc              String
+  kycStatus         String   @default("VERIFIED") @map("kyc_status")
+  accountStatus     String   @default("ACTIVE") @map("account_status")
+  payoutSuccessRate Float    @default(100) @map("payout_success_rate")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  transactions Transaction[]
+
+  @@index([kycStatus])
+  @@index([accountStatus])
+  @@map("vendors")
+}
+
+model Transaction {
+  id            String            @id @default(uuid())
+  externalId    String            @unique @map("external_id")
+  customerId    String            @map("customer_id")
+  vendorId      String            @map("vendor_id")
+  amount        Float
+  currency      String            @default("INR")
+  paymentMethod String            @map("payment_method")
+  status        TransactionStatus @default(PENDING)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  vendor   Vendor   @relation(fields: [vendorId], references: [id])
+
+  nodes         TransactionNode[]
+  splits        PaymentSplit[]
+  deadlocks     Deadlock[]
+  auditLogs     AuditLog[]
+
+  @@index([status])
+  @@index([vendorId])
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+model TransactionNode {
+  id            String     @id @default(uuid())
+  transactionId String     @map("transaction_id")
+  nodeType      NodeType   @map("node_type")
+  status        NodeStatus @default(PENDING)
+  metadata      Json?
+  errorCode     String?    @map("error_code")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId])
+  @@index([status])
+  @@map("transaction_nodes")
+}
+
+model PaymentSplit {
+  id            String      @id @default(uuid())
+  transactionId String      @map("transaction_id")
+  vendorAmount  Float       @map("vendor_amount")
+  platformFee   Float       @map("platform_fee")
+  taxAmount     Float       @map("tax_amount")
+  totalAmount   Float       @map("total_amount")
+  status        SplitStatus @default(PENDING)
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId])
+  @@map("payment_splits")
+}
+
+model Deadlock {
+  id                String         @id @default(uuid())
+  transactionId     String         @map("transaction_id")
+  faultParty        FaultParty     @map("fault_party")
+  rootCause         String         @map("root_cause")
+  confidence         Float
+  severity          String         @default("MEDIUM")
+  status            DeadlockStatus @default(OPEN)
+  recoveryPotential Float          @map("recovery_potential")
+  evidence          Json?
+  alternativeHypotheses Json?      @map("alternative_hypotheses")
+  recommendedAction String?        @map("recommended_action")
+  detectedAt        DateTime       @default(now()) @map("detected_at")
+  resolvedAt        DateTime?      @map("resolved_at")
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  recoveryActions RecoveryAction[]
+  auditLogs       AuditLog[]
+
+  @@index([status])
+  @@index([faultParty])
+  @@index([transactionId])
+  @@map("deadlocks")
+}
+
+model RecoveryAction {
+  id           String       @id @default(uuid())
+  deadlockId   String       @map("deadlock_id")
+  actionType   ActionType   @map("action_type")
+  targetParty  String       @map("target_party")
+  status       ActionStatus @default(PENDING)
+  reason       String
+  confidence   Float
+  idempotencyKey String?    @unique @map("idempotency_key")
+  executedAt   DateTime?    @map("executed_at")
+  completedAt  DateTime?    @map("completed_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  deadlock Deadlock @relation(fields: [deadlockId], references: [id], onDelete: Cascade)
+
+  @@index([deadlockId])
+  @@index([status])
+  @@map("recovery_actions")
+}
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  transactionId String?  @map("transaction_id")
+  deadlockId    String?  @map("deadlock_id")
+  userId        String?  @map("user_id")
+  eventType     String   @map("event_type")
+  message       String
+  reason        String?
+  confidence    Float?
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  deadlock    Deadlock?    @relation(fields: [deadlockId], references: [id], onDelete: SetNull)
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([transactionId])
+  @@index([deadlockId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model RecoveryMission {
+  id                    String         @id @default(uuid())
+  name                  String
+  objective             String?
+  status                MissionStatus  @default(DRAFT)
+  maxRetries            Int            @default(3) @map("max_retries")
+  maxAutomatedAmount    Float          @default(50000) @map("max_automated_amount")
+  minimumConfidence     Float          @default(0.7) @map("minimum_confidence")
+  recoveryWindowHours   Int            @default(72) @map("recovery_window_hours")
+  startedAt             DateTime?      @map("started_at")
+  completedAt           DateTime?      @map("completed_at")
+  createdAt             DateTime       @default(now()) @map("created_at")
+
+  stats RecoveryMissionStats[]
+
+  @@map("recovery_missions")
+}
+
+model RecoveryMissionStats {
+  id                   String   @id @default(uuid())
+  missionId            String   @map("mission_id")
+  transactionsScanned  Int      @default(0) @map("transactions_scanned")
+  deadlocksDetected    Int      @default(0) @map("deadlocks_detected")
+  recoverableCount     Int      @default(0) @map("recoverable_count")
+  actionsExecuted      Int      @default(0) @map("actions_executed")
+  successfulRecoveries Int      @default(0) @map("successful_recoveries")
+  amountAtRisk         Float    @default(0) @map("amount_at_risk")
+  amountRecovered      Float    @default(0) @map("amount_recovered")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  mission RecoveryMission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@index([missionId])
+  @@map("recovery_mission_stats")
+}
+
+model Notification {
+  id            String             @id @default(uuid())
+  recipientType RecipientType      @map("recipient_type")
+  recipientId   String             @map("recipient_id")
+  message       String
+  type          String
+  status        NotificationStatus @default(PENDING)
+  createdAt     DateTime           @default(now()) @map("created_at")
+
+  @@index([recipientType, recipientId])
+  @@map("notifications")
+}
