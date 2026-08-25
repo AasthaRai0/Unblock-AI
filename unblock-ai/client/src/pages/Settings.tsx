@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
 export default function Settings() {
-  const { user, updateUser } = useAuth(); // Assuming updateUser exists in context
+  const { user } = useAuth();
   const [saved, setSaved] = useState(false);
   
   // Account State
@@ -17,10 +17,6 @@ export default function Settings() {
 
   const handleSave = async () => {
     // 1. Backend update call here (e.g., await api.updateSettings(...))
-    if (updateUser) {
-      // Mock update to context if provided
-      updateUser({ ...user, name, email });
-    }
     setSaved(true);
     setEditingAccount(false); // Close edit mode
     setTimeout(() => setSaved(false), 2000);
